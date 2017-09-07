@@ -6,345 +6,325 @@
 </head>
 <body>
     <script>
-    function rotateFigure(figure, direction) {
-        const rows = figure.length, cols = figure[0].length;
-        let result = new Array(cols);
-
-        for (let i = 0; i < cols; i++) {
-            if (!result[i])
-                result[i] = [];
-
-            for (let t = 0; t < rows; t++) {
-                result[i][t] = direction > 0 ? figure[t][cols - 1 - i] : figure[rows - 1 - t][i];
-            }
-        }
-
-        return result;
-    }
-
-    function currentFigureWillCollide(currentFigure, field) {
-        let res = { bottom: false, right: false, left: false };
-
-        if (currentFigure.row == field.length - 1 - currentFigure.figure.length) {
-            res.bottom = true;
-        } else {
-            for (let i = 0; i < currentFigure.figure.length; i++) {
-                for (let t = 0; t < currentFigure.figure[0].length; t++) {
-                    if (field[currentFigure.row + i + 1][currentFigure.col + t] && currentFigure.figure[i][t]) {
-                        res.bottom = true;
-                    }
-                }
-            }
-        }
-
-        if (currentFigure.col == 0) {
-            res.left = true;
-        } else {
-            for (let i = 0; i < currentFigure.figure.length; i++) {
-                for (let t = 0; t < currentFigure.figure[0].length; t++) {
-                    if (field[currentFigure.row + i][currentFigure.col + t - 1] && currentFigure.figure[i][t]) {
-                        res.left = true;
-                    }
-                }
-            }
-        }
-
-        if (currentFigure.col + currentFigure.figure[0].length == field[0].length) {
-            res.right = true;
-        } else {
-            for (let i = 0; i < currentFigure.figure.length; i++) {
-                for (let t = 0; t < currentFigure.figure[0].length; t++) {
-                    if (field[currentFigure.row + i][currentFigure.col + t + 1] && currentFigure.figure[i][t]) {
-                        res.right = true;
-                    }
-                }
-            }
-        }
-
-        return res;
-    }
-
-    const FIGURES = [
-        /*
-        ++++
-        */
-        [[1, 1, 1, 1]],
-
-        /*
-        ++
-        ++
-        */
-        [[1, 1], [1, 1]],
-
-        /*
-        +++
-          +
-        */
-        [[1, 1, 1], [0, 0, 1]],
-
-        /*
-        +++
-        +
-        */
-        [[1, 1, 1], [1, 0, 0]],
-
-        /*
-        ++
-         ++
-        */
-        [[1, 1, 0], [0, 1, 1]],
-
-        /*
-         ++
-        ++
-        */
-        [[0, 1, 1], [1, 1, 0]],
-
-        /*
-         +
-        +++
-        */
-        [[0, 1, 0], [1, 1, 1]]
-    ];
-
-    const COLORS = [ 'red', 'green', 'yellow', 'blue', 'cyan', 'magenta' ];
-    const CELL_SIZE = 20;
-    const FIELD_ROWS = 20, FIELD_COLS = 10;
-
     Array.prototype.sample = function () {
         return this[parseInt(Math.random() * this.length) % this.length]
     };
 
-    function newFigure() {
-        return {
-            row: 0,
-            col: 0,
-            figure: FIGURES.sample()
-        };
-    }
+    const FIGURES = [
+        [[1, 1, 1, 1]],
+        [[1, 1], [1, 1]],
+        [[1, 1, 1], [0, 0, 1]],
+        [[1, 1, 1], [1, 0, 0]],
+        [[1, 1, 0], [0, 1, 1]],
+        [[0, 1, 1], [1, 1, 0]],
+        [[0, 1, 0], [1, 1, 1]]
+    ];
 
-    function newField(rows, cols) {
-        let field = [];
-
-        for (let i = 0; i < rows; i++) {
-            field.push([]);
-
-            for (let t = 0; t < cols; t++) {
-                field[field.length - 1].push(0);
-            }
+    class Figure {
+        constructor(row, col, figure) {
+            this.figure = [].slice.apply(figure);
+            this.rows = figure.length;
+            this.cols = figure[0].length;
+            this.col = col;
+            this.row = row;
         }
 
-        return field;
+        rotate(direction) {
+            let result = new Array(this.cols);
+
+            for (let i = 0; i < this.cols; i++) {
+                if (!result[i])
+                    result[i] = [];
+
+                for (let t = 0; t < this.rows; t++) {
+                    result[i][t] = direction > 0 ? this.figure[t][this.cols - 1 - i] : this.figure[this.rows - 1 - t][i];
+                }
+            }
+
+            this.figure = result;
+
+            this.rows = result.length;
+            this.cols = result[0].length;
+        }
+
+        static generate(row, col) {
+            const data = FIGURES.sample();
+
+            return new Figure(row, col, data);
+        }
     }
 
-    function getCanvasCtx() {
-        const canvas = document.querySelector('#game');
+    class Field {
+        constructor(rows, cols, data) {
+            this.rows = rows;
+            this.cols = cols;
+            this.data = [].slice.apply(data);
+        }
 
-        return canvas.getContext('2d');
+        static generate(rows, cols) {
+            let data = [];
+
+            for (let i = 0; i < rows; i++) {
+                data.push([]);
+
+                for (let t = 0; t < cols; t++) {
+                    data[data.length - 1].push(0);
+                }
+            }
+
+            return new Field(rows, cols, data);
+        }
     }
 
-    function clearCanvas() {
-        const ctx = getCanvasCtx();
+    class Game {
+        constructor(rows, cols) {
+            this.field = Field.generate(rows, cols);
+            this.currentFigure = this._sampleFigure();
+            this.nextFigure = this._sampleFigure();
+            this.score = 0;
+        }
 
-        ctx.clearRect(0, 0, 400, 400);
-    }
+        currentFigureWillCollide() {
+            return {
+                bottom: (this.currentFigure.row == this.field.data.length - 1 - this.currentFigure.figure.length) || this._currentFigureCollisionCheck(1, 0),
 
-    function drawRectangle(x, y, w, h, color) {
-        const ctx = getCanvasCtx();
+                left: (this.currentFigure.col == 0) || this._currentFigureCollisionCheck(0, -1),
 
-        ctx.fillStyle = 'white';
-        ctx.fillRect(x, y, w, h);
+                right: (this.currentFigure.col + this.currentFigure.figure[0].length == this.field.data[0].length) || this._currentFigureCollisionCheck(0, 1)
+            };
+        }
 
-        const borderSize = 2;
+        swapFigures() {
+            let tmpFigure = [].slice.apply(this.currentFigure.figure);
+            this.currentFigure.figure = [].slice.apply(this.nextFigure.figure);
+            this.nextFigure.figure = [].slice.apply(tmpFigure);
+        }
 
-        ctx.fillStyle = 'black';
-        ctx.fillRect(x + borderSize, y + borderSize, w - borderSize, h - borderSize);
+        moveLeft() {
+            if (this.currentFigureWillCollide().left)
+                return;
 
-        /*color = color || COLORS.sample();
+            this.currentFigure.col -= 1;
+        }
 
-        const grd = ctx.createRadialGradient(75, 50, 5, 90, 60, 100);
-        grd.addColorStop(0, color);
-        grd.addColorStop(1, 'white');
+        moveRight() {
+            if (this.currentFigureWillCollide().right)
+                return;
 
-        const gradientSize = 4;
-        const padding = borderSize + gradientSize;
+            this.currentFigure.col += 1;
+        }
 
-        ctx.fillStyle = grd;
-        ctx.fillRect(x + padding, y + padding, w - padding, h - padding);*/
-    }
+        moveDown() {
+            if (this.currentFigureWillCollide().bottom)
+                return;
 
-    function drawText(x, y, text) {
-        const ctx = getCanvasCtx();
+            this.currentFigure.row += 1;
+        }
 
-        ctx.font = '18px "Courier New"';
-        ctx.fillText(text, x, y);
-    }
+        allWayDown() {
+            while (!this.currentFigureWillCollide().bottom) {
+                this.moveDown();
+            }
 
-    function render(currentFigure, nextFigure, field, score) {
-        clearCanvas();
+            this.persistCurrentFigure();
+            this.updateState();
+        }
 
-        for (let i = 0; i < field.length; i++) {
-            for (let t = 0; t < field[0].length; t++) {
-                if (field[i][t]) {
-                    drawRectangle(t * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        rotate() {
+            /// FIXME: when at the right-most side of the field - renders over for some figures (except maybe square)
+            this.currentFigure.rotate();
+        }
+
+        persistCurrentFigure() {
+            for (let i = 0; i < this.currentFigure.rows; i++) {
+                for (let t = 0; t < this.currentFigure.cols; t++) {
+                    this.field.data[this.currentFigure.row + i][this.currentFigure.col + t] = this.field.data[this.currentFigure.row + i][this.currentFigure.col + t] || this.currentFigure.figure[i][t];
                 }
             }
         }
 
-        for (let i = 0; i < currentFigure.figure.length; i++) {
-            for (let t = 0; t < currentFigure.figure[0].length; t++) {
-                if (currentFigure.figure[i][t]) {
-                    drawRectangle((currentFigure.col + t) * CELL_SIZE, (currentFigure.row + i) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        clearFilledRows() {
+            let rowsCleared = 0;
+
+            for (let i = this.field.rows - 1; i > -1; i--) {
+                if (this.field.data[i].every((e) => e === 1)) {
+                    for (let t = i; t > 0; t--) {
+                        this.field.data[t] = [].slice.apply(this.field.data[t - 1]);
+                    }
+
+                    rowsCleared++;
+                    i++;
                 }
             }
+
+            return rowsCleared;
         }
 
-        drawText((field[0].length + 3.5) * CELL_SIZE, ((field.length / 2) - 1) * CELL_SIZE, 'NEXT');
-
-        for (let i = 0; i < nextFigure.figure.length; i++) {
-            for (let t = 0; t < nextFigure.figure[0].length; t++) {
-                if (nextFigure.figure[i][t]) {
-                    drawRectangle((field[0].length + 3 + t) * CELL_SIZE, ((field.length / 2) + i) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                }
-            }
+        isGameOver() {
+            return this.field.data[0].some(e => e === 1);
         }
 
-        drawText((field[0].length + 3.5) * CELL_SIZE, ((field.length / 2) + 5) * CELL_SIZE, 'SCORE');
-        drawText((field[0].length + 3.5) * CELL_SIZE, ((field.length / 2) + 6) * CELL_SIZE, score.toString());
-    }
+        updateState() {
+            if (this.currentFigureWillCollide().bottom) {
+                this.persistCurrentFigure();
+                this.score += this.clearFilledRows();
 
-    function renderGameOverScreen(field, score) {
-        clearCanvas();
-
-        drawText((field[0].length / 2) * CELL_SIZE, (field.length / 2) * CELL_SIZE, 'GAME OVER');
-        drawText((field[0].length / 2) * CELL_SIZE, ((field.length / 2) + 1) * CELL_SIZE, `SCORE: ${score}`);
-    }
-
-    function swapFigures(currentFigure, nextFigure) {
-        let tmpFigure = [].slice.apply(currentFigure.figure);
-        currentFigure.figure = [].slice.apply(nextFigure.figure);
-        nextFigure.figure = [].slice.apply(tmpFigure);
-    }
-
-    function moveLeft(currentFigure, field) {
-        if (currentFigureWillCollide(currentFigure, field).left)
-            return;
-
-        currentFigure.col -= 1;
-    }
-
-    function moveRight(currentFigure, field) {
-        if (currentFigureWillCollide(currentFigure, field).right)
-            return;
-
-        currentFigure.col += 1;
-    }
-
-    function moveDown(currentFigure, field) {
-        if (currentFigureWillCollide(currentFigure, field).bottom)
-            return;
-
-        currentFigure.row += 1;
-    }
-
-    function allWayDown(currentFigure, nextFigure, field, score) {
-        while (!currentFigureWillCollide(currentFigure, field).bottom) {
-            moveDown(currentFigure, field);
-            render(currentFigure, nextFigure, field, score);
-        }
-
-        persistCurrentFigure(currentFigure, field);
-        render(currentFigure, nextFigure, field, score);
-    }
-
-    function persistCurrentFigure(currentFigure, field) {
-        for (let i = 0; i < currentFigure.figure.length; i++) {
-            for (let t = 0; t < currentFigure.figure[0].length; t++) {
-                field[currentFigure.row + i][currentFigure.col + t] = field[currentFigure.row + i][currentFigure.col + t] || currentFigure.figure[i][t];
-            }
-        }
-    }
-
-    function clearFilledRows(field) {
-        let rowsCleared = 0;
-
-        for (let i = field.length - 1; i > -1; i--) {
-            if (field[i].every((e) => e === 1)) {
-                for (let t = i; t > 0; t--) {
-                    field[t] = [].slice.apply(field[t - 1]);
+                if (this.isGameOver()) {
+                    return;
                 }
 
-                rowsCleared++;
-                i++;
+                this.currentFigure = this.nextFigure;
+                this.nextFigure = this._sampleFigure();
+            } else {
+                this.moveDown();
             }
         }
 
-        return rowsCleared;
+        _currentFigureCollisionCheck(deltaRow, deltaCol) {
+            for (let i = 0; i < this.currentFigure.rows; i++) {
+                for (let t = 0; t < this.currentFigure.cols; t++) {
+                    if (this.field.data[this.currentFigure.row + i + deltaRow][this.currentFigure.col + t + deltaCol] && this.currentFigure.figure[i][t]) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        _sampleFigure() {
+            return Figure.generate(0, (this.field.cols / 2) - 2);
+        }
     }
 
-    function isGameOver(field) {
-        return field[0].some(e => e === 1);
+    class Renderer {
+        constructor(game, cellSize) {
+            this.game = game;
+            this.cellSize = cellSize;
+        }
+
+        init() {
+            this._createCanvas();
+        }
+
+        updateState() {
+            this._render();
+        }
+
+        _createCanvas() {
+            this.canvasWidth = (this.game.field.cols + 3 + 4) * this.cellSize;
+            this.canvasHeight = (this.game.field.rows) * this.cellSize;
+
+            this.canvas = document.createElement('canvas');
+            this.canvas.setAttribute('id', 'game');
+            this.canvas.setAttribute('width', this.canvasWidth.toString());
+            this.canvas.setAttribute('height', this.canvasHeight.toString());
+
+            document.body.appendChild(this.canvas);
+
+            this.ctx = this.canvas.getContext('2d');
+        }
+
+        _clearCanvas() {
+            this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+
+        _drawRectangle(x, y, w, h, color) {
+            this.ctx.fillStyle = 'white';
+            this.ctx.fillRect(x, y, w, h);
+
+            const borderSize = 2;
+
+            this.ctx.fillStyle = 'black';
+            this.ctx.fillRect(x + borderSize, y + borderSize, w - borderSize, h - borderSize);
+        }
+
+        _drawText(x, y, text) {
+            this.ctx.font = '18px "Courier New"';
+            this.ctx.fillText(text, x, y);
+        }
+
+        _render() {
+            this._clearCanvas();
+
+            for (let i = 0; i < this.game.field.rows; i++) {
+                for (let t = 0; t < this.game.field.cols; t++) {
+                    if (this.game.field.data[i][t]) {
+                        this._drawRectangle(t * this.cellSize, i * this.cellSize, this.cellSize, this.cellSize);
+                    }
+                }
+            }
+
+            for (let i = 0; i < this.game.currentFigure.rows; i++) {
+                for (let t = 0; t < this.game.currentFigure.cols; t++) {
+                    if (this.game.currentFigure.figure[i][t]) {
+                        this._drawRectangle((this.game.currentFigure.col + t) * this.cellSize, (this.game.currentFigure.row + i) * this.cellSize, this.cellSize, this.cellSize);
+                    }
+                }
+            }
+
+            this._drawText((this.game.field.cols + 3.5) * this.cellSize, ((this.game.field.rows / 2) - 1) * this.cellSize, 'NEXT');
+
+            for (let i = 0; i < this.game.nextFigure.rows; i++) {
+                for (let t = 0; t < this.game.nextFigure.cols; t++) {
+                    if (this.game.nextFigure.figure[i][t]) {
+                        this._drawRectangle((this.game.field.cols + 3 + t) * this.cellSize, ((this.game.field.rows / 2) + i) * this.cellSize, this.cellSize, this.cellSize);
+                    }
+                }
+            }
+
+            this._drawText((this.game.field.cols + 3.5) * this.cellSize, ((this.game.field.rows / 2) + 5) * this.cellSize, 'SCORE');
+            this._drawText((this.game.field.cols + 3.5) * this.cellSize, ((this.game.field.rows / 2) + 6) * this.cellSize, this.game.score.toString());
+        }
+
+        renderGameOverScreen() {
+            this._clearCanvas();
+
+            this._drawText((this.game.field.cols / 2) * this.cellSize, (this.game.field.rows / 2) * this.cellSize, 'GAME OVER');
+            this._drawText((this.game.field.cols / 2) * this.cellSize, ((this.game.field.rows / 2) + 1) * this.cellSize, `SCORE: ${this.game.score}`);
+        }
     }
 
     (function () {
-        const canvas = document.createElement('canvas');
-        canvas.setAttribute('id', 'game');
-        canvas.setAttribute('width', ((FIELD_COLS + 3 + 4) * CELL_SIZE).toString());
-        canvas.setAttribute('height', ((FIELD_ROWS) * CELL_SIZE).toString());
-        document.body.appendChild(canvas);
+        const CELL_SIZE = 20;
+        const FIELD_ROWS = 20, FIELD_COLS = 10;
 
-        let currentFigure = newFigure(),
-            nextFigure = newFigure(),
-            score = 0;
+        const game = new Game(FIELD_ROWS, FIELD_COLS);
+        const renderer = new Renderer(game, CELL_SIZE);
 
-        let field = newField(FIELD_ROWS, FIELD_COLS);
+        renderer.init();
 
         const keyHandler = function (evt) {
             if (evt.keyCode == 37) { // left
-                moveLeft(currentFigure, field);
+                game.moveLeft();
             } else if (evt.keyCode == 39) { // right
-                moveRight(currentFigure, field);
+                game.moveRight();
             } else if (evt.keyCode == 40) { // down
-                allWayDown(currentFigure, nextFigure, field, score);
-                // moveDown(currentFigure, field);
+                game.allWayDown();
+                // moveDown();
             } else if (evt.keyCode == 38) { // up
-                currentFigure.figure = rotateFigure(currentFigure.figure);
+                game.rotate();
             } else if (evt.keyCode == 32) { // spacebar
-                swapFigures(currentFigure, nextFigure);
+                game.swapFigures();
             }
 
-            render(currentFigure, nextFigure, field, score);
+            renderer.updateState();
         };
 
         window.addEventListener('keydown', keyHandler);
 
-        const gameLoop = function () {
-            if (currentFigureWillCollide(currentFigure, field).bottom) {
-                persistCurrentFigure(currentFigure, field);
-                score += clearFilledRows(field);
+        const gameLoopIntervalId = setInterval(() => {
+            if (game.isGameOver()) {
+                clearInterval(gameLoopIntervalId);
+                window.removeEventListener('keydown', keyHandler);
 
-                if (isGameOver(field)) {
-                    clearInterval(gameLoopIntervalId);
-                    window.removeEventListener('keydown', keyHandler);
-
-                    console.warn('GAME OVER');
-                    console.info('YOUR SCORE:', score);
-
-                    renderGameOverScreen(field, score);
-
-                    return;
-                }
-
-                currentFigure = Object.assign({}, nextFigure);
-                nextFigure = newFigure();
-            } else {
-                moveDown(currentFigure, field);
+                renderer.renderGameOverScreen();
+                return;
             }
 
-            render(currentFigure, nextFigure, field, score);
-        };
-
-        const gameLoopIntervalId = setInterval(gameLoop, 1000);
+            game.updateState();
+            renderer.updateState();
+        }, 1000);
     })();
     </script>
 </body>
