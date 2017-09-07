@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tetris</title>
+</head>
+<body>
+    <script>
+    function rotateFigure(figure, direction) {
+        const rows = figure.length, cols = figure[0].length;
+        let result = new Array(cols);
+
+        for (let i = 0; i < cols; i++) {
+            if (!result[i])
+                result[i] = [];
+
+            for (let t = 0; t < rows; t++) {
+                result[i][t] = direction > 0 ? figure[t][cols - 1 - i] : figure[rows - 1 - t][i];
+            }
+        }
+
+        return result;
+    }
+
+    function currentFigureWillCollide(currentFigure, field) {
+        let res = { bottom: false, right: false, left: false };
+
+        if (currentFigure.row == field.length - 1 - currentFigure.figure.length) {
+            res.bottom = true;
+        } else {
+            for (let i = 0; i < currentFigure.figure.length; i++) {
+                for (let t = 0; t < currentFigure.figure[0].length; t++) {
+                    if (field[currentFigure.row + i + 1][currentFigure.col + t] && currentFigure.figure[i][t]) {
+                        res.bottom = true;
+                    }
+                }
+            }
+        }
+
+        if (currentFigure.col == 0) {
+            res.left = true;
+        } else {
+            for (let i = 0; i < currentFigure.figure.length; i++) {
+                for (let t = 0; t < currentFigure.figure[0].length; t++) {
+                    if (field[currentFigure.row + i][currentFigure.col + t - 1] && currentFigure.figure[i][t]) {
+                        res.left = true;
+                    }
+                }
+            }
+        }
+
+        if (currentFigure.col + currentFigure.figure[0].length == field[0].length) {
+            res.right = true;
+        } else {
+            for (let i = 0; i < currentFigure.figure.length; i++) {
+                for (let t = 0; t < currentFigure.figure[0].length; t++) {
+                    if (field[currentFigure.row + i][currentFigure.col + t + 1] && currentFigure.figure[i][t]) {
+                        res.right = true;
+                    }
+                }
+            }
+        }
+
+        return res;
+    }
+
+    const FIGURES = [
+        /*
+        ++++
+        */
+        [[1, 1, 1, 1]],
+
+        /*
+        ++
+        ++
+        */
+        [[1, 1], [1, 1]],
+
+        /*
+        +++
+          +
+        */
+        [[1, 1, 1], [0, 0, 1]],
+
+        /*
+        +++
+        +
+        */
+        [[1, 1, 1], [1, 0, 0]],
+
+        /*
+        ++
+         ++
+        */
+        [[1, 1, 0], [0, 1, 1]],
+
+        /*
+         ++
+        ++
+        */
+        [[0, 1, 1], [1, 1, 0]],
+
+        /*
+         +
+        +++
+        */
+        [[0, 1, 0], [1, 1, 1]]
+    ];
+
+    const COLORS = [ 'red', 'green', 'yellow', 'blue', 'cyan', 'magenta' ];
+    const CELL_SIZE = 20;
+    const FIELD_ROWS = 20, FIELD_COLS = 10;
+
+    Array.prototype.sample = function () {
+        return this[parseInt(Math.random() * this.length) % this.length]
+    };
+
+    function newFigure() {
+        return {
+            row: 0,
+            col: 0,
+            figure: FIGURES.sample()
+        };
+    }
+
+    function newField(rows, cols) {
+        let field = [];
+
+        for (let i = 0; i < rows; i++) {
+            field.push([]);
+
+            for (let t = 0; t < cols; t++) {
+                field[field.length - 1].push(0);
+            }
+        }
+
+        return field;
+    }
+
+    function getCanvasCtx() {
+        const canvas = document.querySelector('#game');
+
+        return canvas.getContext('2d');
+    }
+
+    function clearCanvas() {
+        const ctx = getCanvasCtx();
+
+        ctx.clearRect(0, 0, 400, 400);
+    }
+
+    function drawRectangle(x, y, w, h, color) {
+        const ctx = getCanvasCtx();
+
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x, y, w, h);
+
+        const borderSize = 2;
+
+        ctx.fillStyle = 'black';
+        ctx.fillRect(x + borderSize, y + borderSize, w - borderSize, h - borderSize);
+
+        /*color = color || COLORS.sample();
+
+        const grd = ctx.createRadialGradient(75, 50, 5, 90, 60, 100);
+        grd.addColorStop(0, color);
+        grd.addColorStop(1, 'white');
+
+        const gradientSize = 4;
+        const padding = borderSize + gradientSize;
+
+        ctx.fillStyle = grd;
+        ctx.fillRect(x + padding, y + padding, w - padding, h - padding);*/
+    }
+
+    function drawText(x, y, text) {
+        const ctx = getCanvasCtx();
+
+        ctx.font = '18px "Courier New"';
+        ctx.fillText(text, x, y);
+    }
+
+    function render(currentFigure, nextFigure, field, score) {
+        clearCanvas();
+
+        for (let i = 0; i < field.length; i++) {
+            for (let t = 0; t < field[0].length; t++) {
+                if (field[i][t]) {
+                    drawRectangle(t * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+            }
+        }
+
+        for (let i = 0; i < currentFigure.figure.length; i++) {
+            for (let t = 0; t < currentFigure.figure[0].length; t++) {
+                if (currentFigure.figure[i][t]) {
+                    drawRectangle((currentFigure.col + t) * CELL_SIZE, (currentFigure.row + i) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+            }
+        }
+
+        drawText((field[0].length + 3.5) * CELL_SIZE, ((field.length / 2) - 1) * CELL_SIZE, 'NEXT');
+
+        for (let i = 0; i < nextFigure.figure.length; i++) {
+            for (let t = 0; t < nextFigure.figure[0].length; t++) {
+                if (nextFigure.figure[i][t]) {
+                    drawRectangle((field[0].length + 3 + t) * CELL_SIZE, ((field.length / 2) + i) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+            }
+        }
+
+        drawText((field[0].length + 3.5) * CELL_SIZE, ((field.length / 2) + 5) * CELL_SIZE, 'SCORE');
+        drawText((field[0].length + 3.5) * CELL_SIZE, ((field.length / 2) + 6) * CELL_SIZE, score.toString());
+    }
+
+    function renderGameOverScreen(field, score) {
+        clearCanvas();
+
+        drawText((field[0].length / 2) * CELL_SIZE, (field.length / 2) * CELL_SIZE, 'GAME OVER');
+        drawText((field[0].length / 2) * CELL_SIZE, ((field.length / 2) + 1) * CELL_SIZE, `SCORE: ${score}`);
+    }
+
+    function swapFigures(currentFigure, nextFigure) {
+        let tmpFigure = [].slice.apply(currentFigure.figure);
+        currentFigure.figure = [].slice.apply(nextFigure.figure);
+        nextFigure.figure = [].slice.apply(tmpFigure);
+    }
+
+    function moveLeft(currentFigure, field) {
+        if (currentFigureWillCollide(currentFigure, field).left)
+            return;
+
+        currentFigure.col -= 1;
+    }
+
+    function moveRight(currentFigure, field) {
+        if (currentFigureWillCollide(currentFigure, field).right)
+            return;
+
+        currentFigure.col += 1;
+    }
+
+    function moveDown(currentFigure, field) {
+        if (currentFigureWillCollide(currentFigure, field).bottom)
+            return;
+
+        currentFigure.row += 1;
+    }
+
+    function allWayDown(currentFigure, nextFigure, field, score) {
+        while (!currentFigureWillCollide(currentFigure, field).bottom) {
+            moveDown(currentFigure, field);
+            render(currentFigure, nextFigure, field, score);
+        }
+
+        persistCurrentFigure(currentFigure, field);
+        render(currentFigure, nextFigure, field, score);
+    }
+
+    function persistCurrentFigure(currentFigure, field) {
+        for (let i = 0; i < currentFigure.figure.length; i++) {
+            for (let t = 0; t < currentFigure.figure[0].length; t++) {
+                field[currentFigure.row + i][currentFigure.col + t] = field[currentFigure.row + i][currentFigure.col + t] || currentFigure.figure[i][t];
+            }
+        }
+    }
+
+    function clearFilledRows(field) {
+        let rowsCleared = 0;
+
+        for (let i = field.length - 1; i > -1; i--) {
+            if (field[i].every((e) => e === 1)) {
+                for (let t = i; t > 0; t--) {
+                    field[t] = [].slice.apply(field[t - 1]);
+                }
+
+                rowsCleared++;
+                i++;
+            }
+        }
+
+        return rowsCleared;
+    }
+
+    function isGameOver(field) {
+        return field[0].some(e => e === 1);
+    }
+
+    (function () {
+        const canvas = document.createElement('canvas');
+        canvas.setAttribute('id', 'game');
+        canvas.setAttribute('width', ((FIELD_COLS + 3 + 4) * CELL_SIZE).toString());
+        canvas.setAttribute('height', ((FIELD_ROWS) * CELL_SIZE).toString());
+        document.body.appendChild(canvas);
+
+        let currentFigure = newFigure(),
+            nextFigure = newFigure(),
+            score = 0;
+
+        let field = newField(FIELD_ROWS, FIELD_COLS);
+
+        const keyHandler = function (evt) {
+            if (evt.keyCode == 37) { // left
+                moveLeft(currentFigure, field);
+            } else if (evt.keyCode == 39) { // right
+                moveRight(currentFigure, field);
+            } else if (evt.keyCode == 40) { // down
+                allWayDown(currentFigure, nextFigure, field, score);
+                // moveDown(currentFigure, field);
+            } else if (evt.keyCode == 38) { // up
+                currentFigure.figure = rotateFigure(currentFigure.figure);
+            } else if (evt.keyCode == 32) { // spacebar
+                swapFigures(currentFigure, nextFigure);
+            }
+
+            render(currentFigure, nextFigure, field, score);
+        };
+
+        window.addEventListener('keydown', keyHandler);
+
+        const gameLoop = function () {
+            if (currentFigureWillCollide(currentFigure, field).bottom) {
+                persistCurrentFigure(currentFigure, field);
+                score += clearFilledRows(field);
+
+                if (isGameOver(field)) {
+                    clearInterval(gameLoopIntervalId);
+                    window.removeEventListener('keydown', keyHandler);
+
+                    console.warn('GAME OVER');
+                    console.info('YOUR SCORE:', score);
+
+                    renderGameOverScreen(field, score);
+
+                    return;
+                }
+
+                currentFigure = Object.assign({}, nextFigure);
+                nextFigure = newFigure();
+            } else {
+                moveDown(currentFigure, field);
+            }
+
+            render(currentFigure, nextFigure, field, score);
+        };
+
+        const gameLoopIntervalId = setInterval(gameLoop, 1000);
+    })();
+    </script>
+</body>
+</html>
