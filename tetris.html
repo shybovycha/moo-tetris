@@ -7,7 +7,7 @@
 <body>
     <script>
     Array.prototype.sample = function () {
-        return this[parseInt(Math.random() * this.length) % this.length]
+        return this[parseInt(Math.random() * parseInt(Math.pow(10, Math.ceil(Math.log10(this.length))))) % this.length];
     };
 
     const FIGURES = [
